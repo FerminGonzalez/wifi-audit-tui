@@ -75,6 +75,61 @@ El lanzador te pide root si no lo eres.
 
 ---
 
+## Interfaz web (otra opción)
+
+Además de la TUI, el proyecto incluye una **aplicación web** que usa el mismo
+núcleo. El servidor usa **solo la librería estándar de Python** (no necesita
+`textual`), así que arranca en cualquier sistema, incluido **Windows**.
+
+> **Importante:** el modo monitor y la inyección **solo funcionan en Linux**.
+> El servidor debe ejecutarse **donde está aircrack-ng** (tu VM de Kali) y **la
+> abres desde el navegador de Windows**. En Windows el servidor arranca y la
+> interfaz se ve, pero mostrará que faltan las herramientas y no podrá operar.
+
+### Arrancar el servidor (en la VM de Kali)
+```bash
+sudo .venv/bin/python -m wifi_audit.web
+# o, si lo instalaste como paquete:
+sudo wifi-audit-web
+```
+Por defecto escucha en `http://127.0.0.1:8730`. Verás en consola la URL y la
+carpeta de sesión.
+
+### Acceder desde Windows
+Elige una opción según cómo tengas configurada la VM:
+
+**A) Red en modo puente (lo más simple):** da a la VM una IP accesible.
+```bash
+# en el servidor (Kali)
+sudo .venv/bin/python -m wifi_audit.web --host 0.0.0.0
+```
+Se genera un **token** y se imprime en consola. Abre en Windows:
+```
+http://<IP-de-la-VM>:8730/?token=<TOKEN>
+```
+
+**B) Túnel SSH (recomendado, no expone nada):** desde Windows/PowerShell:
+```powershell
+ssh -L 8730:127.0.0.1:8730 usuario@IP-de-la-VM
+```
+Y en el navegador de Windows: `http://127.0.0.1:8730`
+
+### Opciones del servidor
+```bash
+python -m wifi_audit.web --help
+#   --host 127.0.0.1     dirección de escucha
+#   --port 8730          puerto
+#   --sessions DIR       carpeta raíz de sesiones
+#   --token TOKEN        token de acceso (obligatorio fuera de localhost)
+```
+
+### Seguridad
+- Por defecto solo escucha en `127.0.0.1`.
+- Si lo expones en red (`--host 0.0.0.0`) **exige token** automáticamente.
+- Igual que la TUI, exige escribir `AUTORIZADO` antes de operar.
+
+---
+
 ## Flujo de trabajo típico
 
 1. **Interfaz**: pulsa *Refrescar*, elige tu adaptador y *Iniciar monitor*.
@@ -111,15 +166,21 @@ wifi-audit-tui/
     │   ├── scanner.py        # parser del CSV de airodump-ng
     │   ├── cracker.py        # aircrack-ng
     │   ├── attacks.py        # aireplay-ng / airbase-ng
+    │   ├── controller.py     # lógica de sesión compartida (TUI + web)
     │   └── report.py         # informes Markdown + HTML
-    └── screens/
-        ├── authorization.py  # modal de autorización
-        └── main.py           # pantalla principal con las pestañas
+    ├── screens/
+    │   ├── authorization.py  # modal de autorización (TUI)
+    │   └── main.py           # pantalla principal con las pestañas (TUI)
+    └── web/
+        ├── server.py         # servidor HTTP (librería estándar) + API
+        └── static/
+            └── index.html    # interfaz web (HTML/CSS/JS sin dependencias)
 ```
 
-La lógica de la suite vive **solo** en `wifi_audit/core/`; la UI no construye
-comandos a mano salvo para mostrarlos, lo que facilita testear el núcleo o
-reutilizarlo (por ejemplo en una CLI o una API).
+La lógica de la suite vive **solo** en `wifi_audit/core/`. La interfaz web usa
+`core/controller.py`, que orquesta las operaciones (escaneo, captura, ataques,
+cracking, AP falso, informe) sin depender de ninguna UI. Así el mismo núcleo
+alimenta tanto la TUI como la app web.
 
 ---
 

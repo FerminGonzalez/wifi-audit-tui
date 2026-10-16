@@ -1,0 +1,413 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WiFi Audit TUI — Web</title>
+<style>
+  :root {
+    --bg: #0f1117; --panel: #161b22; --panel2: #1c2230; --border: #30363d;
+    --text: #e6edf3; --muted: #8b949e; --accent: #7ee787; --accent2: #58a6ff;
+    --warn: #f0b429; --err: #f85149; --ok: #3fb950;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 14px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  header { padding: 10px 16px; background: var(--panel); border-bottom: 1px solid var(--border);
+           display: flex; align-items: center; gap: 12px; position: sticky; top: 0; z-index: 5; }
+  header h1 { font-size: 16px; margin: 0; color: var(--accent); white-space: nowrap; }
+  #envbar { color: var(--muted); font-size: 12px; display: flex; flex-wrap: wrap; gap: 10px; }
+  #envbar b { color: var(--text); font-weight: 600; }
+  .pill { padding: 1px 8px; border-radius: 999px; border: 1px solid var(--border); }
+  .pill.ok { color: var(--ok); border-color: var(--ok); }
+  .pill.bad { color: var(--err); border-color: var(--err); }
+  .pill.warn { color: var(--warn); border-color: var(--warn); }
+
+  nav { display: flex; flex-wrap: wrap; gap: 4px; padding: 8px 16px 0; background: var(--bg);
+        border-bottom: 1px solid var(--border); position: sticky; top: 49px; z-index: 4; }
+  nav button { background: transparent; border: 1px solid transparent; border-bottom: none;
+               color: var(--muted); padding: 8px 12px; cursor: pointer; border-radius: 6px 6px 0 0; }
+  nav button:hover { color: var(--text); background: var(--panel); }
+  nav button.active { color: var(--text); background: var(--panel); border-color: var(--border); }
+
+  main { padding: 16px; max-width: 1200px; margin: 0 auto; }
+  section { display: none; }
+  section.active { display: block; }
+  h2 { font-size: 14px; color: var(--accent2); margin: 4px 0 12px; text-transform: uppercase;
+       letter-spacing: .05em; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+  label { color: var(--muted); font-size: 12px; }
+  input, select { background: var(--panel2); color: var(--text); border: 1px solid var(--border);
+                  border-radius: 6px; padding: 7px 9px; font: inherit; min-width: 150px; }
+  input:focus, select:focus { outline: none; border-color: var(--accent2); }
+  button.act { background: var(--panel2); color: var(--text); border: 1px solid var(--border);
+               border-radius: 6px; padding: 8px 14px; cursor: pointer; font: inherit; }
+  button.act:hover { border-color: var(--accent2); }
+  button.act.primary { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+  button.act.good { background: #238636; border-color: #238636; color: #fff; }
+  button.act.danger { background: #6e1a1a; border-color: #b62324; color: #fff; }
+  button.act.warn { background: #6b4c00; border-color: #b8860b; color: #fff; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 16px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border);
+           white-space: nowrap; }
+  th { color: var(--muted); font-weight: 600; background: var(--panel); position: sticky; top: 0; }
+  tbody tr { cursor: pointer; }
+  tbody tr:hover { background: var(--panel2); }
+  tbody tr.sel { background: #12351f; box-shadow: inset 3px 0 0 var(--accent); }
+  .tablewrap { max-height: 340px; overflow: auto; border: 1px solid var(--border);
+               border-radius: 8px; }
+
+  pre.log { background: #0b0e14; border: 1px solid var(--border); border-radius: 8px;
+            padding: 10px; height: 260px; overflow: auto; font-size: 12px; color: #c9d1d9;
+            white-space: pre-wrap; }
+  .muted { color: var(--muted); }
+  .status { color: var(--accent); margin: 8px 0; min-height: 20px; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+          padding: 12px; margin-bottom: 12px; }
+
+  #auth { position: fixed; inset: 0; background: rgba(5,7,10,.92); z-index: 50;
+          display: flex; align-items: center; justify-content: center; padding: 20px; }
+  #auth .box { background: var(--panel); border: 2px solid var(--err); border-radius: 10px;
+               max-width: 680px; padding: 20px 24px; }
+  #auth h2 { color: var(--err); }
+  #auth pre { white-space: pre-wrap; color: #c9d1d9; font-size: 13px; }
+
+  #toasts { position: fixed; right: 16px; bottom: 16px; display: flex; flex-direction: column;
+            gap: 8px; z-index: 60; }
+  .toast { background: var(--panel2); border: 1px solid var(--border); border-left: 4px solid var(--accent2);
+           padding: 10px 14px; border-radius: 6px; max-width: 380px; box-shadow: 0 6px 20px rgba(0,0,0,.4); }
+  .toast.err { border-left-color: var(--err); }
+  .toast.ok { border-left-color: var(--ok); }
+</style>
+</head>
+<body>
+<header>
+  <h1>WiFi Audit TUI — Web</h1>
+  <div id="envbar">cargando…</div>
+</header>
+
+<nav id="tabs"></nav>
+
+<main>
+  <section id="tab-iface">
+    <h2>1 · Interfaz y modo monitor</h2>
+    <div class="row">
+      <label>Interfaz</label>
+      <select id="iface"></select>
+      <button class="act" onclick="load()">Refrescar</button>
+      <button class="act warn" onclick="post('/api/monitor/kill')">check kill</button>
+      <button class="act good" onclick="startMonitor()">Iniciar monitor</button>
+      <button class="act danger" onclick="post('/api/monitor/stop')">Detener monitor</button>
+    </div>
+    <div class="status" id="iface-status"></div>
+    <p class="muted">En Windows la app arranca pero no hay adaptador inalámbrico: ejecútala
+      en la VM de Kali y abre esta página desde el navegador de Windows.</p>
+  </section>
+
+  <section id="tab-scan">
+    <h2>2 · Escaneo</h2>
+    <div class="row">
+      <input id="scan-ch" placeholder="Canal (opcional)">
+      <input id="scan-bssid" placeholder="BSSID (opcional)">
+      <button class="act good" onclick="startScan()">Iniciar escaneo</button>
+      <button class="act danger" onclick="post('/api/scan/stop')">Detener</button>
+      <button class="act" onclick="setTarget(selectedBssid)">Fijar seleccionado como objetivo</button>
+    </div>
+    <div class="tablewrap"><table id="ap-table">
+      <thead><tr><th>BSSID</th><th>ESSID</th><th>CH</th><th>Cifrado</th><th>PWR</th>
+      <th>Beacons</th><th>Data</th><th>Clientes</th></tr></thead><tbody></tbody></table></div>
+    <h2>Clientes</h2>
+    <div class="tablewrap"><table id="cl-table">
+      <thead><tr><th>MAC</th><th>AP</th><th>PWR</th><th>Paquetes</th><th>Probes</th></tr></thead>
+      <tbody></tbody></table></div>
+  </section>
+
+  <section id="tab-capture">
+    <h2>3 · Captura</h2>
+    <div class="card" id="target-info">Objetivo: (ninguno)</div>
+    <div class="row">
+      <input id="cap-ch" placeholder="Canal">
+      <button class="act good" onclick="startCapture()">Iniciar captura</button>
+      <button class="act danger" onclick="post('/api/capture/stop')">Detener captura</button>
+      <button class="act warn" onclick="deauth()">Deauth (forzar handshake)</button>
+    </div>
+    <div class="status" id="cap-status"></div>
+  </section>
+
+  <section id="tab-attack">
+    <h2>4 · Ataques (aireplay-ng)</h2>
+    <div class="row">
+      <input id="atk-client" placeholder="Cliente MAC (opcional)">
+      <input id="atk-count" value="10" placeholder="N deauths" style="min-width:110px">
+      <button class="act warn" onclick="deauth()">Deauth</button>
+      <button class="act warn" onclick="post('/api/attack/fakeauth')">Fake auth</button>
+      <button class="act warn" onclick="post('/api/attack/arpreplay')">ARP replay (WEP)</button>
+    </div>
+    <pre class="log" id="atk-log"></pre>
+  </section>
+
+  <section id="tab-crack">
+    <h2>5 · Cracking (aircrack-ng)</h2>
+    <div class="row">
+      <label>Diccionario</label>
+      <input id="wordlist" placeholder="/usr/share/wordlists/rockyou.txt" style="min-width:340px">
+    </div>
+    <div class="row">
+      <label>Captura</label>
+      <select id="capfile"></select>
+      <button class="act" onclick="load()">Refrescar capturas</button>
+      <button class="act good" onclick="startCrack()">Iniciar cracking</button>
+      <button class="act danger" onclick="post('/api/crack/stop')">Detener</button>
+    </div>
+    <div class="status" id="crack-status"></div>
+  </section>
+
+  <section id="tab-fakeap">
+    <h2>6 · AP falso (airbase-ng)</h2>
+    <div class="row">
+      <input id="ap-essid" placeholder="MiAP-Audit">
+      <input id="ap-ch" placeholder="Canal" style="min-width:110px">
+      <button class="act good" onclick="startFakeAp()">Iniciar AP falso</button>
+      <button class="act danger" onclick="post('/api/fakeap/stop')">Detener</button>
+    </div>
+    <pre class="log" id="ap-log"></pre>
+  </section>
+
+  <section id="tab-report">
+    <h2>7 · Informe</h2>
+    <div class="row">
+      <button class="act primary" onclick="makeReport()">Generar informe</button>
+    </div>
+    <div class="status" id="report-status"></div>
+    <h2>Cronología</h2>
+    <pre class="log" id="events"></pre>
+  </section>
+
+  <section id="tab-log">
+    <h2>8 · Registro</h2>
+    <pre class="log" id="main-log"></pre>
+  </section>
+</main>
+
+<div id="auth">
+  <div class="box">
+    <h2>AVISO LEGAL Y AUTORIZACIÓN</h2>
+    <pre>Esta herramienta ejecuta operaciones ACTIVAS sobre redes inalámbricas.
+
+Úsala SOLO sobre redes de tu propiedad o para las que tengas autorización
+escrita. El uso no autorizado es delito en la mayoría de países.
+
+Escribe AUTORIZADO para confirmar que tienes autorización.</pre>
+    <div class="row">
+      <input id="auth-input" placeholder="AUTORIZADO">
+      <button class="act good" onclick="authorize()">Confirmar</button>
+    </div>
+    <div class="status" id="auth-status"></div>
+  </div>
+</div>
+
+<div id="toasts"></div>
+
+<script>
+const TABS = [
+  ["tab-iface","1 Interfaz"], ["tab-scan","2 Escaneo"], ["tab-capture","3 Captura"],
+  ["tab-attack","4 Ataques"], ["tab-crack","5 Cracking"], ["tab-fakeap","6 AP falso"],
+  ["tab-report","7 Informe"], ["tab-log","8 Registro"],
+];
+const TOKEN = new URLSearchParams(location.search).get("token") || "";
+let selectedBssid = null;
+let lastLogs = [];
+
+// -------- navegación
+const nav = document.getElementById("tabs");
+TABS.forEach(([id,label], i) => {
+  const b = document.createElement("button");
+  b.textContent = label; b.dataset.tab = id;
+  if (i === 0) b.classList.add("active");
+  b.onclick = () => selectTab(id);
+  nav.appendChild(b);
+});
+function selectTab(id) {
+  document.querySelectorAll("nav button").forEach(b => b.classList.toggle("active", b.dataset.tab === id));
+  document.querySelectorAll("main section").forEach(s => s.classList.toggle("active", s.id === id));
+}
+selectTab("tab-iface");
+
+// -------- utilidades
+function toast(msg, kind) {
+  const t = document.createElement("div");
+  t.className = "toast" + (kind ? " " + kind : "");
+  t.textContent = msg;
+  document.getElementById("toasts").appendChild(t);
+  setTimeout(() => t.remove(), 4500);
+}
+async function api(path, method = "GET", body = null) {
+  const headers = { "Content-Type": "application/json" };
+  if (TOKEN) headers["X-Auth-Token"] = TOKEN;
+  const res = await fetch(path, {
+    method, headers, body: body ? JSON.stringify(body) : null
+  });
+  return res.json().catch(() => ({ ok: false, error: "respuesta inválida" }));
+}
+async function post(path, body = {}) {
+  const r = await api(path, "POST", body);
+  toast(r.message || r.error || "ok", r.ok ? "ok" : "err");
+  load();
+  return r;
+}
+
+// -------- polling de estado
+async function load() {
+  const r = await api("/api/state");
+  if (!r.ok) return;
+  render(r.state);
+}
+async function tick() { try { await load(); } catch (e) {} }
+
+// -------- render
+function render(s) {
+  const e = s.env, missing = e.missing_tools || [];
+  const mon = e.monitor_iface
+    ? `<span class="pill ok">monitor <b>${e.monitor_iface}</b></span>`
+    : `<span class="pill warn">sin monitor</span>`;
+  const tools = missing.length
+    ? `<span class="pill bad">faltan: ${missing.join(", ")}</span>`
+    : `<span class="pill ok">suite aircrack-ng OK</span>`;
+  document.getElementById("envbar").innerHTML =
+    `<span class="pill ${e.root ? "ok" : "bad"}">root ${e.root ? "sí" : "NO"}</span>` +
+    tools + mon +
+    `<span class="pill">iface <b>${e.iface || "-"}</b></span>` +
+    `<span class="pill">${e.session_dir}</span>`;
+
+  // autorización
+  document.getElementById("auth").style.display = e.authorized ? "none" : "flex";
+
+  // interfaz
+  const sel = document.getElementById("iface");
+  const cur = sel.value;
+  const opts = e.wireless_ifaces || [];
+  if (sel.dataset.list !== opts.join(",")) {
+    sel.innerHTML = opts.map(o => `<option>${o}</option>`).join("") ||
+      `<option value="">(ninguna)</option>`;
+    sel.dataset.list = opts.join(",");
+    if (cur) sel.value = cur;
+  }
+
+  // objetivo
+  const t = s.target || {};
+  document.getElementById("target-info").innerHTML = t.bssid
+    ? `Objetivo: <b>${t.essid || "?"}</b> · ${t.bssid} · canal ${t.channel || "-"}`
+    : "Objetivo: (ninguno)";
+
+  // tablas
+  const aps = (s.aps || []).slice().sort((a,b) => (parseInt(b.power)||-999) - (parseInt(a.power)||-999));
+  document.querySelector("#ap-table tbody").innerHTML = aps.map(a => {
+    const selCls = a.bssid === selectedBssid ? " class=\"sel\"" : "";
+    return `<tr${selCls} data-bssid="${a.bssid}"><td>${a.bssid}</td><td>${esc(a.essid)}</td>` +
+      `<td>${a.channel}</td><td>${a.encryption}</td><td>${a.power}</td>` +
+      `<td>${a.beacons}</td><td>${a.data}</td><td>${a.clients}</td></tr>`;
+  }).join("") || `<tr><td colspan="8" class="muted">Sin datos. Inicia un escaneo.</td></tr>`;
+  document.querySelector("#cl-table tbody").innerHTML = (s.clients || []).map(c =>
+    `<tr><td>${c.mac}</td><td>${c.bssid || "-"}</td><td>${c.power}</td>` +
+    `<td>${c.packets}</td><td>${esc(c.probed) || "-"}</td></tr>`
+  ).join("") || `<tr><td colspan="5" class="muted">Sin clientes.</td></tr>`;
+
+  // capturas
+  const cf = document.getElementById("capfile");
+  const curCf = cf.value;
+  const caps = s.captures || [];
+  if (cf.dataset.list !== caps.join(",")) {
+    cf.innerHTML = caps.map(c => `<option>${c}</option>`).join("") || `<option value="">(sin capturas)</option>`;
+    cf.dataset.list = caps.join(",");
+    if (curCf) cf.value = curCf;
+  }
+
+  // logs
+  const logs = s.logs || [];
+  lastLogs = logs;
+  setLog("main-log", logs);
+  setLog("atk-log", logs);
+  setLog("ap-log", logs);
+  setLog("events", s.events || []);
+}
+
+function setLog(id, lines) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = lines.join("\n");
+  el.scrollTop = el.scrollHeight;
+}
+function esc(s) {
+  return (s || "").replace(/[&<>"]/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;" }[c]));
+}
+
+// -------- acciones
+function authorize() {
+  const phrase = document.getElementById("auth-input").value;
+  api("/api/authorize", "POST", { phrase }).then(r => {
+    if (!r.ok) { document.getElementById("auth-status").textContent = r.message || r.error; }
+    load();
+  });
+}
+function startMonitor() {
+  const iface = document.getElementById("iface").value;
+  post("/api/monitor/start", { iface });
+}
+function startScan() {
+  post("/api/scan/start", {
+    channel: document.getElementById("scan-ch").value || null,
+    bssid: document.getElementById("scan-bssid").value || null,
+  });
+}
+function setTarget(bssid) {
+  if (!bssid) return toast("Selecciona una fila de la tabla de APs", "err");
+  post("/api/target", { bssid });
+}
+function startCapture() {
+  post("/api/capture/start", { channel: document.getElementById("cap-ch").value || null });
+}
+function deauth() {
+  post("/api/attack/deauth", {
+    client: document.getElementById("atk-client").value || null,
+    count: parseInt(document.getElementById("atk-count").value) || 10,
+  });
+}
+function startCrack() {
+  post("/api/crack/start", {
+    capfile: document.getElementById("capfile").value,
+    wordlist: document.getElementById("wordlist").value,
+  });
+}
+function startFakeAp() {
+  post("/api/fakeap/start", {
+    essid: document.getElementById("ap-essid").value,
+    channel: document.getElementById("ap-ch").value || null,
+  });
+}
+async function makeReport() {
+  const r = await post("/api/report");
+  if (r.ok && r.info) {
+    document.getElementById("report-status").innerHTML =
+      `Informe generado:<br>${esc(r.info.markdown)}<br>${esc(r.info.html)}`;
+  }
+}
+
+// selección de fila en la tabla de APs (delegación de eventos)
+document.querySelector("#ap-table tbody").addEventListener("click", ev => {
+  const tr = ev.target.closest("tr[data-bssid]");
+  if (!tr) return;
+  selectedBssid = tr.dataset.bssid;
+  document.querySelectorAll("#ap-table tbody tr").forEach(x => x.classList.remove("sel"));
+  tr.classList.add("sel");
+});
+
+document.getElementById("auth-input").addEventListener("keydown", ev => {
+  if (ev.key === "Enter") authorize();
+});
+
+load();
+setInterval(tick, 1000);
+</script>
+</body>
+</html>
