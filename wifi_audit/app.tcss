@@ -1,0 +1,101 @@
+/* Estilos de WiFi Audit TUI */
+
+Screen {
+    background: $background;
+}
+
+#env-status {
+    background: $panel;
+    color: $text;
+    padding: 0 1;
+    height: 1;
+}
+
+.hint {
+    color: $text-muted;
+    padding: 1 0 0 1;
+}
+
+.row {
+    height: auto;
+    margin: 0 0 1 0;
+}
+
+.row Input {
+    width: 1fr;
+    margin: 0 1 0 0;
+}
+
+.row Button {
+    margin: 0 1 0 0;
+}
+
+DataTable {
+    height: 1fr;
+    min-height: 6;
+    border: round $primary 40%;
+}
+
+#ap-table {
+    height: 2fr;
+}
+
+#client-table {
+    height: 1fr;
+}
+
+RichLog {
+    height: 1fr;
+    min-height: 8;
+    border: round $accent 40%;
+    background: $surface;
+}
+
+#report-preview {
+    border: round $success 40%;
+    padding: 1;
+    margin-top: 1;
+}
+
+/* --- Modal de autorizacion --- */
+AuthorizationScreen {
+    align: center middle;
+}
+
+#auth-box {
+    width: 80;
+    max-width: 90%;
+    height: auto;
+    max-height: 90%;
+    background: $surface;
+    border: thick $error;
+    padding: 1 2;
+}
+
+#auth-title {
+    text-style: bold;
+    color: $error;
+    width: 100%;
+    content-align: center middle;
+    padding-bottom: 1;
+}
+
+#auth-text {
+    height: auto;
+    color: $text;
+}
+
+#auth-prompt {
+    padding-top: 1;
+    color: $warning;
+}
+
+#auth-buttons {
+    height: auto;
+    align-horizontal: right;
+    padding-top: 1;
+}
+
+#auth-buttons Button {
+    margin-left: 1;
+}

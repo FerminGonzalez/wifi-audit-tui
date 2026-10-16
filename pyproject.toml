@@ -1,0 +1,25 @@
+[project]
+name = "wifi-audit-tui"
+version = "1.0.0"
+description = "Interfaz TUI (Textual) sobre la suite aircrack-ng para auditorias Wi-Fi autorizadas"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "textual>=0.85",
+    "rich>=13.7",
+]
+
+[project.scripts]
+wifi-audit = "wifi_audit.app:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["wifi_audit*"]
+
+[tool.setuptools.package-data]
+wifi_audit = ["*.tcss"]

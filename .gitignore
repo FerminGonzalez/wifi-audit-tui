@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Pruebas / cobertura
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Salidas de la herramienta: nunca subir capturas ni informes de auditoria
+wifi-audit-sessions/
+*.cap
+*.pcap
+*.cap.gz
+scan-*.csv
+capture-*.csv
+capture-*.cap
+*handshake*
+
+# Editores / SO
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
