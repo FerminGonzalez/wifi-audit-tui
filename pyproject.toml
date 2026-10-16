@@ -12,7 +12,6 @@ dependencies = [
 
 [project.scripts]
 wifi-audit = "wifi_audit.app:main"
-wifi-audit-web = "wifi_audit.web.server:main"
 
 [build-system]
 requires = ["setuptools>=68"]
@@ -23,4 +22,4 @@ where = ["."]
 include = ["wifi_audit*"]
 
 [tool.setuptools.package-data]
-wifi_audit = ["*.tcss", "web/static/*.html"]
+wifi_audit = ["*.tcss"]
