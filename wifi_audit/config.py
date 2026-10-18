@@ -23,6 +23,22 @@ TOOL_NAMES = [
     "airbase-ng",
 ]
 
+# --- Capa de IA (opcional) -------------------------------------------------
+# WIFI_AUDIT_AI: "off" | "ollama" | "api" | "auto"  (auto = detecta)
+AI_MODE = os.environ.get("WIFI_AUDIT_AI", "auto").strip().lower()
+AI_BASE_URL = os.environ.get("WIFI_AUDIT_AI_BASE_URL", "").strip()
+AI_MODEL = os.environ.get("WIFI_AUDIT_AI_MODEL", "").strip()
+AI_API_KEY = (
+    os.environ.get("WIFI_AUDIT_AI_KEY")
+    or os.environ.get("LLM_API_KEY")
+    or ""
+).strip()
+AI_TIMEOUT = float(os.environ.get("WIFI_AUDIT_AI_TIMEOUT", "60"))
+
+# Valores por defecto si el modo es "ollama" y no se especifica nada.
+OLLAMA_BASE_URL = "http://localhost:11434/v1"
+OLLAMA_MODEL = "minicpm-v"
+
 
 def new_session_dir() -> Path:
     """Crea y devuelve un directorio de sesion con marca de tiempo."""

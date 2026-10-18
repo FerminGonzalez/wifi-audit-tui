@@ -19,7 +19,8 @@ class WifiAuditApp(App):
     TITLE = f"{APP_NAME} v{VERSION}"
     SUB_TITLE = "Auditoria Wi-Fi autorizada sobre la suite aircrack-ng"
     SCREENS = {"main": MainScreen}
-    BINDINGS = [("ctrl+q", "quit", "Salir")]
+    BINDINGS = [("ctrl+q", "quit", "Salir"),
+                ("f9", "start_auto", "Auditoria auto")]
 
     def __init__(self) -> None:
         super().__init__()
@@ -52,6 +53,13 @@ class WifiAuditApp(App):
     def log_event(self, text: str) -> None:
         self.state.events.append(f"{now_iso()}  {text}")
         self.log_line(f"* {text}")
+
+    def action_start_auto(self) -> None:
+        """F9: lanza la auditoria automatica desde la pestana activa."""
+        screen = self.screen
+        trigger = getattr(screen, "trigger_auto", None)
+        if callable(trigger):
+            trigger()
 
     def on_unmount(self) -> None:
         """Garantiza que no dejamos procesos de la suite corriendo."""

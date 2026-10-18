@@ -20,13 +20,15 @@ from textual.widgets import (
     RichLog,
     Select,
     Static,
+    Switch,
     TabbedContent,
     TabPane,
 )
 from textual.worker import get_current_worker
 
 from ..config import is_root, now_iso
-from ..core import attacks, cracker, interface, scanner
+from ..core import attacks, ai, cracker, interface, scanner
+from ..core.orchestrator import AutoAuditor
 from ..core.report import write_report
 from ..core.runner import CommandError, ManagedProcess
 from ..core.tools import detect_tools
@@ -44,6 +46,8 @@ class MainScreen(Screen):
         self._selected_bssid: str | None = None
         self._ap_cols: list[Any] = []
         self._client_cols: list[Any] = []
+        self._auto_auditor: AutoAuditor | None = None
+        self._auto_stop_requested = False
 
     # ------------------------------------------------------------------ UI
     def compose(self) -> ComposeResult:
@@ -137,6 +141,31 @@ class MainScreen(Screen):
                 with VerticalScroll():
                     yield RichLog(id="main-log", highlight=True, markup=False, wrap=True)
 
+            with TabPane("9 Auto + IA", id="tab-auto"):
+                with VerticalScroll():
+                    yield Static("", id="auto-ai-status")
+                    yield Label("Diccionario para el cracking automatico (wordlist)")
+                    yield Input(placeholder="/usr/share/wordlists/rockyou.txt",
+                                id="auto-wordlist")
+                    with Horizontal(classes="row"):
+                        yield Label("Seg. escaneo")
+                        yield Input(value="30", id="auto-scan-secs")
+                        yield Label("Seg. captura")
+                        yield Input(value="60", id="auto-cap-secs")
+                        yield Label("Usar IA")
+                        yield Switch(value=True, id="auto-use-ai")
+                    yield Static("Flujo completo: interfaz -> escaneo -> objetivo -> "
+                                 "metodo (IA/determinista) -> captura/ataque -> "
+                                 "cracking -> informe.", classes="hint")
+                    with Horizontal(classes="row"):
+                        yield Button("Ejecutar auditoria automatica",
+                                     id="btn-auto-start", variant="primary")
+                        yield Button("Detener", id="btn-auto-stop", variant="error")
+                        yield Button("Generar informe", id="btn-auto-report",
+                                     variant="success")
+                    yield Static("", id="auto-status")
+                    yield RichLog(id="auto-log", highlight=True, markup=False, wrap=True)
+
         yield Footer()
 
     # ------------------------------------------------------------- montaje
@@ -154,6 +183,11 @@ class MainScreen(Screen):
         self.refresh_ifaces()
         self.refresh_captures()
         self.update_env()
+        try:
+            self.query_one("#auto-ai-status", Static).update(
+                f"[b]{ai.describe_backend()}[/b]")
+        except Exception:
+            pass
         self.app.log_line(f"Sesion: {self.app.state.session_dir}")
 
     # ------------------------------------------------------------- helpers
@@ -704,7 +738,8 @@ class MainScreen(Screen):
         }
         try:
             md_path, html_path = write_report(
-                st.session_dir, meta, st.aps, st.clients, st.cracks, st.attacks, st.events
+                st.session_dir, meta, st.aps, st.clients, st.cracks, st.attacks,
+                st.events, ai_analysis=st.ai_analysis or None,
             )
         except Exception as exc:  # noqa: BLE001
             self.notify(f"Error generando informe: {exc}", severity="error")
@@ -719,6 +754,113 @@ class MainScreen(Screen):
         self.query_one("#report-preview", Static).update(preview)
         self.app.log_event(f"Informe generado: {md_path.name}")
         self.notify("Informe generado.")
+
+    # ================================================================= Auto + IA
+    def _int_input(self, widget_id: str, default: int) -> int:
+        raw = self.query_one(f"#{widget_id}", Input).value.strip()
+        return int(raw) if raw.isdigit() else default
+
+    def _auto_log(self, text: str) -> None:
+        self._write_log("auto-log", text)
+
+    def trigger_auto(self) -> None:
+        """Punto de entrada para el atajo de teclado (F9)."""
+        self._on_auto_start()
+
+    @on(Button.Pressed, "#btn-auto-start")
+    def _on_auto_start(self) -> None:
+        if not self._require_root():
+            return
+        if not self.app.state.authorized:
+            self.notify("Falta la confirmacion de autorizacion.", severity="error")
+            return
+        if self.app.state.auto_running:
+            self.notify("Ya hay una auditoria automatica en curso.",
+                        severity="warning")
+            return
+
+        st = self.app.state
+        wordlist = self.query_one("#auto-wordlist", Input).value.strip() or None
+        use_ai = self.query_one("#auto-use-ai", Switch).value
+        scan_seconds = self._int_input("auto-scan-secs", 30)
+        capture_seconds = self._int_input("auto-cap-secs", 60)
+
+        st.auto_running = True
+        self._auto_stop_requested = False
+        self.query_one("#auto-status", Static).update(
+            "Auditoria automatica en curso ...")
+        self._auto_log("[auto] iniciando flujo automatico completo")
+
+        self._auto_auditor = AutoAuditor(
+            st.session_dir,
+            iface=st.iface,
+            monitor_iface=st.monitor_iface,
+            target_bssid=st.target_bssid,
+            wordlist=wordlist,
+            scan_seconds=scan_seconds,
+            capture_seconds=capture_seconds,
+            use_ai=use_ai,
+            on_log=lambda m: self.app.call_from_thread(self._auto_log, m),
+            on_event=lambda m: self.app.call_from_thread(self.app.log_event, m),
+            should_stop=lambda: self._auto_stop_requested,
+        )
+        self._auto_worker(self._auto_auditor)
+
+    @work(thread=True)
+    def _auto_worker(self, auditor: AutoAuditor) -> None:
+        try:
+            result = auditor.run()
+        except Exception as exc:  # noqa: BLE001
+            result = {"error": str(exc), "aborted": True}
+        self.app.call_from_thread(self._auto_finished, result)
+
+    def _auto_finished(self, result: dict) -> None:
+        st = self.app.state
+        st.auto_running = False
+        st.auto_result = result
+        st.ai_analysis = result.get("ai_analysis", "") or ""
+        self._auto_auditor = None
+
+        # Refleja la interfaz usada y refresca tablas/capturas.
+        st.iface = result.get("interfaz") or st.iface
+        if st.monitor_iface and not interface.is_monitor(st.monitor_iface):
+            st.monitor_iface = None
+        self.refresh_captures()
+        self.refresh_monitor_status()
+        self.update_env()
+
+        key = result.get("key") or ""
+        status = result.get("outcome") or result.get("error") or "-"
+        if key:
+            st.cracks.append({
+                "capfile": "auto",
+                "bssid": (result.get("target") or {}).get("bssid", ""),
+                "status": "CLAVE ENCONTRADA",
+                "key": key,
+                "timestamp": now_iso(),
+            })
+            summary = f"Completado. Resultado: {status}. CLAVE: {key}"
+        else:
+            summary = f"Completado. Resultado: {status}."
+        summary += " Pulsa 'Generar informe' para el informe con analisis IA."
+
+        self.query_one("#auto-status", Static).update(summary)
+        self._auto_log(f"[auto] fin del flujo: {status}")
+        if result.get("ai_analysis"):
+            self._auto_log("[ia] " + result["ai_analysis"])
+        self.notify(("Clave encontrada: " + key) if key else "Flujo automatico fin.",
+                    severity="information" if key else "warning")
+
+    @on(Button.Pressed, "#btn-auto-stop")
+    def _on_auto_stop(self) -> None:
+        self._auto_stop_requested = True
+        if self._auto_auditor:
+            self._auto_auditor.stop()
+        self.notify("Solicitada parada del flujo automatico.", severity="warning")
+
+    @on(Button.Pressed, "#btn-auto-report")
+    def _on_auto_report(self) -> None:
+        self._on_report()
 
     # ================================================================= utils
     def _kill_process(self, name: str) -> None:

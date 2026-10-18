@@ -32,3 +32,8 @@ class AppState:
     cracks: list[dict] = field(default_factory=list)
     attacks: list[str] = field(default_factory=list)
     events: list[str] = field(default_factory=list)
+
+    # Flujo automatico / IA
+    auto_running: bool = False
+    auto_result: dict = field(default_factory=dict)
+    ai_analysis: str = ""

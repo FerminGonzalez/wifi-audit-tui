@@ -27,6 +27,7 @@ def render_markdown(
     cracks: list[dict],
     attacks: list[str],
     events: list[str],
+    ai_analysis: str | None = None,
 ) -> str:
     lines: list[str] = []
     lines.append("# Informe de auditoria Wi-Fi\n")
@@ -83,6 +84,11 @@ def render_markdown(
         lines.append(f"- {ev}")
     lines.append("")
 
+    if ai_analysis:
+        lines.append("## Analisis asistido por IA\n")
+        lines.append(ai_analysis.strip())
+        lines.append("")
+
     lines.append("---\n")
     lines.append("_Informe generado por WiFi Audit TUI. Uso exclusivo en redes "
                  "propias o con autorizacion escrita._\n")
@@ -133,10 +139,12 @@ def write_report(
     cracks: list[dict],
     attacks: list[str],
     events: list[str],
+    ai_analysis: str | None = None,
 ) -> tuple[Path, Path]:
     md_path = session_dir / "report.md"
     html_path = session_dir / "report.html"
-    markdown_text = render_markdown(meta, aps, clients, cracks, attacks, events)
+    markdown_text = render_markdown(meta, aps, clients, cracks, attacks, events,
+                                    ai_analysis=ai_analysis)
     md_path.write_text(markdown_text, encoding="utf-8")
     html_path.write_text(render_html(markdown_text), encoding="utf-8")
     return md_path, html_path

@@ -25,7 +25,15 @@ que envuelve la **suite aircrack-ng** para realizar auditorías Wi-Fi
 | **6 AP falso** | Levanta un punto de acceso falso | `airbase-ng` |
 | **7 Informe** | Genera informe Markdown + HTML de la sesión | — |
 | **8 Registro** | Salida cruda de todas las herramientas | — |
+| **9 Auto + IA** | Auditoría automática completa decidida por IA | suite + IA |
 
+- **Modo automático (pestaña 9 o tecla F9)**: un solo botón ejecuta todo el
+  flujo —comprobación de entorno, `check kill`, modo monitor, escaneo, elección
+  de objetivo, captura, ataque activo si hace falta, cracking y análisis— sin
+  intervención.
+- **Elección de método según el caso** con tabla determinista (siempre como
+  respaldo) y, si hay IA configurada, recomendación validada contra una lista
+  de enfoques permitidos. Ver más abajo.
 - Escaneo en vivo parseando el **CSV** de `airodump-ng` (más robusto que
   interpretar la salida curses).
 - Todo el trabajo de cada sesión se guarda en `~/wifi-audit-sessions/session-<fecha>/`.
@@ -91,6 +99,64 @@ El lanzador te pide root si no lo eres.
 
 ---
 
+## Auditoría automática e IA
+
+La pestaña **9 Auto + IA** (o la tecla **F9**) ejecuta el flujo completo sin
+intervención: prepara la interfaz, escanea, elige objetivo, decide el método,
+captura, ataca si hace falta, crackea, interpreta los resultados y los deja
+listos para el informe. Todo queda registrado en la cronología de la sesión.
+
+### Elección del método (según el caso)
+
+| AP detectado | Enfoque automático |
+|---|---|
+| WEP | `fakeauth` + `arpreplay` (generar IVs) y cracking sin diccionario |
+| WPA/WPA2 con clientes | captura + `deauth` dirigido → handshake 4 vías |
+| WPA/WPA2 sin clientes | PMKID (client-less) primero |
+| WPA3 / SAE | no atacable por diccionario → se documenta |
+| Red abierta | se documenta como hallazgo |
+
+Si hay IA configurada, propone el enfoque y una justificación; la respuesta se
+**valida contra una lista de enfoques permitidos** y, ante cualquier duda,
+falla, o si no hay IA, se usa la tabla determinista de arriba. La IA nunca es
+la única barrera: la autorización del arranque sigue siendo obligatoria.
+
+### Configuración de la IA (opcional)
+
+La capa de IA es agnóstica: funciona con **Ollama local** o con cualquier
+**API compatible con OpenAI** (DeepSeek, OpenAI, Groq...). Se controla por
+variables de entorno —no hay dependencias nuevas, usa `urllib`:
+
+| Variable | Descripción | Por defecto |
+|---|---|---|
+| `WIFI_AUDIT_AI` | `off` \| `ollama` \| `api` \| `auto` | `auto` |
+| `WIFI_AUDIT_AI_BASE_URL` | URL base (sin `/chat/completions`) | Ollama local |
+| `WIFI_AUDIT_AI_MODEL` | Modelo a usar | `minicpm-v` (Ollama) |
+| `WIFI_AUDIT_AI_KEY` | Clave de API (cae a `LLM_API_KEY`) | — |
+| `WIFI_AUDIT_AI_TIMEOUT` | Timeout HTTP en segundos | `60` |
+
+Ejemplos:
+
+```bash
+# Ollama local (por defecto en modo auto si no hay URL)
+export WIFI_AUDIT_AI=ollama
+export WIFI_AUDIT_AI_MODEL=minicpm-v
+
+# API remota compatible con OpenAI
+export WIFI_AUDIT_AI=api
+export WIFI_AUDIT_AI_BASE_URL=https://api.deepseek.com/v1
+export WIFI_AUDIT_AI_MODEL=deepseek-chat
+export WIFI_AUDIT_AI_KEY=sk-...
+
+# Sin IA (solo tabla determinista)
+export WIFI_AUDIT_AI=off
+```
+
+La IA se usa para tres cosas: **elegir el método** por AP, **interpretar los
+resultados** (qué se capturó, qué falló) y **generar el análisis del informe**.
+
+---
+
 ## Estructura del proyecto
 
 ```
@@ -111,6 +177,8 @@ wifi-audit-tui/
     │   ├── scanner.py        # parser del CSV de airodump-ng
     │   ├── cracker.py        # aircrack-ng
     │   ├── attacks.py        # aireplay-ng / airbase-ng
+    │   ├── ai.py             # capa de IA (OpenAI-compatible / Ollama)
+    │   ├── orchestrator.py   # flujo automatico y tabla de decision
     │   └── report.py         # informes Markdown + HTML
     └── screens/
         ├── authorization.py  # modal de autorización
