@@ -58,6 +58,24 @@ que envuelve la **suite aircrack-ng** para realizar auditorías Wi-Fi
 
 ## Instalación
 
+### Instalación rápida (recomendada)
+
+Con el instalador de una línea (instala dependencias, clona y deja el launcher):
+
+```bash
+curl -sSL https://raw.githubusercontent.com/FerminGonzalez/wifi-audit-tui/main/install.sh | sudo bash
+```
+
+O con el paquete **`.deb`** (Kali/Debian), que resuelve las dependencias vía `apt`:
+
+```bash
+./packaging/build-deb.sh                                   # genera dist/wifi-audit-tui_1.0.0_all.deb
+sudo apt install ./dist/wifi-audit-tui_1.0.0_all.deb       # instala con dependencias
+wifi-audit-tui                                             # lanzar
+```
+
+### Instalación manual (desarrollo)
+
 ```bash
 cd wifi-audit-tui
 python3 -m venv .venv

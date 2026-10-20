@@ -1,0 +1,13 @@
+Package: wifi-audit-tui
+Version: 1.0.0
+Section: net
+Priority: optional
+Architecture: all
+Depends: aircrack-ng, python3, python3-textual (>= 0.85), python3-rich (>= 13.7)
+Maintainer: Fermin Gonzalez <ferming1541@gmail.com>
+Homepage: https://github.com/FerminGonzalez/wifi-audit-tui
+Description: TUI de auditoría Wi-Fi sobre la suite aircrack-ng
+ Interfaz de terminal (Textual) que envuelve la suite aircrack-ng para
+ realizar auditorías Wi-Fi autorizadas: escaneo, captura de handshake,
+ ataques activos, cracking y generación de informes. Requiere un adaptador
+ con soporte de modo monitor.

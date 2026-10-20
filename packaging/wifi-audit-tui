@@ -1,0 +1,3 @@
+#!/bin/sh
+# Wrapper del paquete .deb: lanza la TUI desde /usr/lib/python3/dist-packages.
+exec python3 -m wifi_audit "$@"
