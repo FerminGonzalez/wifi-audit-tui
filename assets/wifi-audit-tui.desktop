@@ -1,0 +1,11 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=WiFi Audit TUI
+Comment=Auditoría Wi-Fi autorizada sobre la suite aircrack-ng
+Exec=bash -c 'cd /home/ghost/wifi-audit-tui && exec ./run.sh'
+Icon=/home/ghost/wifi-audit-tui/assets/wifi-audit-tui.svg
+Terminal=true
+Categories=Security;System;Network;
+Keywords=wifi;audit;aircrack;monitor;tui;seguridad;
+StartupNotify=true
