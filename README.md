@@ -81,6 +81,34 @@ sudo python3 -m wifi_audit
 
 El lanzador te pide root si no lo eres.
 
+### Diagnóstico
+
+Comprueba el entorno (Python, dependencias, suite aircrack-ng, adaptador y
+modo monitor) sin abrir la TUI:
+
+```bash
+sudo python3 -m wifi_audit --check
+# opcional: omitir la prueba de modo monitor
+sudo python3 -m wifi_audit --check --no-monitor
+```
+
+El diagnóstico reconoce adaptadores USB conocidos e informa si el chipset
+soporta modo monitor real (p. ej. marca el MediaTek MT7921U como *limitado*).
+
+### Launcher de escritorio
+
+El repositorio incluye un acceso directo con icono en `assets/`:
+
+```bash
+mkdir -p ~/.local/share/applications
+cp assets/wifi-audit-tui.desktop ~/.local/share/applications/
+cp assets/wifi-audit-tui.desktop ~/Escritorio 2>/dev/null || cp assets/wifi-audit-tui.desktop ~/Desktop
+chmod +x ~/.local/share/applications/wifi-audit-tui.desktop
+```
+
+> El `.desktop` usa rutas absolutas de `~/wifi-audit-tui`; edítalo si instalas
+> el proyecto en otra ruta.
+
 ---
 
 ## Flujo de trabajo típico
@@ -164,11 +192,15 @@ wifi-audit-tui/
 ├── pyproject.toml
 ├── requirements.txt
 ├── run.sh
+├── assets/
+│   ├── wifi-audit-tui.desktop  # launcher de escritorio
+│   └── wifi-audit-tui.svg      # icono
 └── wifi_audit/
     ├── app.py                # App de Textual + estado global
     ├── app.tcss              # estilos
     ├── auth.py               # aviso legal / frase de autorización
     ├── config.py             # rutas, detección de root
+    ├── diagnostics.py        # modo --check (diagnóstico sin TUI)
     ├── state.py              # estado de la sesión
     ├── core/
     │   ├── runner.py         # subprocess con streaming y parada por grupo
@@ -212,6 +244,9 @@ Si ejecutas Kali en una máquina virtual:
   contener el PMKID.
 - El modo monitor/inyección depende por completo del **driver**; algunos
   adaptadores no soportan inyección.
+- **MediaTek MT7921U** (y otros chipsets `mt76`) pueden cambiar a modo monitor
+  pero **no capturar frames** — `airodump-ng` ve 0 redes. Usa un chipset
+  probado (Atheros AR9271, Ralink RT5370/RT3070) para escaneo/captura real.
 - El escaneo se refresca cada segundo; con cientos de APs la tabla puede
   actualizarse algo despacio (normal).
 
