@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from typing import Optional
 
 from textual import work
@@ -72,6 +73,11 @@ class WifiAuditApp(App):
 
 
 def main() -> None:
+    if any(arg in sys.argv[1:] for arg in ("--check", "--diagnose", "-c", "check")):
+        from .diagnostics import run_check
+
+        include_monitor = "--no-monitor" not in sys.argv[1:]
+        raise SystemExit(run_check(include_monitor=include_monitor))
     WifiAuditApp().run()
 
 
